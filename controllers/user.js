@@ -54,9 +54,6 @@ export const sendOTP = async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ message: "Error sending OTP", error: error.message });
-        console.log(error);
-
-
     }
 };
 
@@ -75,7 +72,6 @@ export const verifyOTP = async (req, res) => {
             return res.status(400).json({ message: "Invalid or expired OTP" });
         }
 
-        // OTP is valid, update user status
         user.isVerified = true;
         user.otp = undefined;
         user.otpExpiresAt = undefined;
