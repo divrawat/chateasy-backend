@@ -24,7 +24,7 @@ const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString()
 
 export const sendOTP = async (req, res) => {
     try {
-        const { email } = req.body;
+        const { email, phone } = req.body;
 
 
         const otp = generateOTP();
