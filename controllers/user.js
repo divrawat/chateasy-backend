@@ -20,7 +20,7 @@ const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
 
 export const sendOTP = async (req, res) => {
     try {
-        const { email, phone } = req.body;
+        var { email, phone } = req.body;
 
         if (!phone) {
             return res.status(400).json({ message: "Phone number is required" });
@@ -47,7 +47,7 @@ export const sendOTP = async (req, res) => {
 
         const mailOptions = {
             from: process.env.SMTP_USER,
-            to: email, // Now always has a value (either provided or fetched)
+            to: email,
             subject: "Your OTP Code",
             text: `Your OTP is: ${otp}. It is valid for 10 minutes.`,
         };
