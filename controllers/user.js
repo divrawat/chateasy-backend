@@ -7,17 +7,14 @@ dotenv.config();
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,
-    secure: false, // Use TLS
-    tls: {
-        rejectUnauthorized: false
-    },
+    secure: false,
+    tls: { rejectUnauthorized: false },
     auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS
     }
 });
 
-// Generate a 4-digit OTP
 const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
 
 
@@ -37,25 +34,27 @@ export const sendOTP = async (req, res) => {
         const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
         if (!user) {
-            // If user doesn't exist, create new user (Signup)
+            // Signup: User doesn't exist, create a new one
             if (!email) {
                 return res.status(400).json({ message: "Email is required for signup" });
             }
-
             user = new User({ email, phone, otp, otpExpiresAt });
         } else {
-            // If user exists, update OTP for login
-            email = user.email; // Ensure email remains the stored one for existing users
+            // Login: User exists, retrieve the stored email
+            email = user.email; // Pick email from database
+            if (!email) {
+                return res.status(500).json({ message: "Email not found for this phone number" });
+            }
             user.otp = otp;
             user.otpExpiresAt = otpExpiresAt;
         }
 
         await user.save();
 
-        // Send OTP to email (new or existing)
+        // Send OTP to the correct email
         const mailOptions = {
             from: process.env.SMTP_USER,
-            to: email, // Ensure correct email is used
+            to: email, // Now always has a value (either provided or fetched)
             subject: "Your OTP Code",
             text: `Your OTP is: ${otp}. It is valid for 10 minutes.`,
         };
@@ -68,6 +67,7 @@ export const sendOTP = async (req, res) => {
         res.status(500).json({ message: "Error sending OTP", error: error.message });
     }
 };
+
 
 
 
