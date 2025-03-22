@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 import User from "../models/user.js";
-import axios from "axios";
 import nodemailer from 'nodemailer';
 dotenv.config();
 
@@ -22,29 +21,41 @@ const transporter = nodemailer.createTransport({
 const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
 
 
-
 export const sendOTP = async (req, res) => {
     try {
         const { email, phone } = req.body;
 
+        if (!phone) {
+            return res.status(400).json({ message: "Phone number is required" });
+        }
 
+        // Find user by phone number
+        let user = await User.findOne({ phone });
+
+        // Generate OTP and expiration time
         const otp = generateOTP();
         const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-        // Find or create user
-        let user = await User.findOne({ phone });
         if (!user) {
-            user = new User({ phone, otp, otpExpiresAt });
+            // If user doesn't exist, create new user (Signup)
+            if (!email) {
+                return res.status(400).json({ message: "Email is required for signup" });
+            }
+
+            user = new User({ email, phone, otp, otpExpiresAt });
         } else {
+            // If user exists, update OTP for login
+            email = user.email; // Ensure email remains the stored one for existing users
             user.otp = otp;
             user.otpExpiresAt = otpExpiresAt;
         }
+
         await user.save();
 
-        // Send OTP via email
+        // Send OTP to email (new or existing)
         const mailOptions = {
             from: process.env.SMTP_USER,
-            to: email,
+            to: email, // Ensure correct email is used
             subject: "Your OTP Code",
             text: `Your OTP is: ${otp}. It is valid for 10 minutes.`,
         };
@@ -57,6 +68,10 @@ export const sendOTP = async (req, res) => {
         res.status(500).json({ message: "Error sending OTP", error: error.message });
     }
 };
+
+
+
+
 
 // Verify OTP
 export const verifyOTP = async (req, res) => {
