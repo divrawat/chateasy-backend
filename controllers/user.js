@@ -18,8 +18,9 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// Generate a 6-digit OTP
-const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
+// Generate a 4-digit OTP
+const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
+
 
 
 export const sendOTP = async (req, res) => {
