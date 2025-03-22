@@ -26,41 +26,35 @@ export const sendOTP = async (req, res) => {
             return res.status(400).json({ message: "Phone number is required" });
         }
 
-        // Find user by phone number
         let user = await User.findOne({ phone });
-
-        // Generate OTP and expiration time
         const otp = generateOTP();
         const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
+        var register_email = req.body.email;
+        var login_email;
+
         if (!user) {
-            // Signup: User doesn't exist, create a new one
-            if (!email) {
+            if (!register_email) {
                 return res.status(400).json({ message: "Email is required for signup" });
             }
-            user = new User({ email, phone, otp, otpExpiresAt });
+            user = new User({ register_email, phone, otp, otpExpiresAt });
         } else {
-            // Login: User exists, retrieve the stored email
-            email = user.email; // Pick email from database
-            if (!email) {
-                return res.status(500).json({ message: "Email not found for this phone number" });
-            }
+            login_email = user.email;
+            if (!login_email) { return res.status(500).json({ message: "Email not found for this phone number" }); }
             user.otp = otp;
             user.otpExpiresAt = otpExpiresAt;
         }
 
         await user.save();
 
-        // Send OTP to the correct email
         const mailOptions = {
             from: process.env.SMTP_USER,
-            to: email, // Now always has a value (either provided or fetched)
+            to: login_email,
             subject: "Your OTP Code",
             text: `Your OTP is: ${otp}. It is valid for 10 minutes.`,
         };
 
         await transporter.sendMail(mailOptions);
-
         res.status(200).json({ message: "OTP sent successfully" });
 
     } catch (error) {
