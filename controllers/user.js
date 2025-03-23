@@ -4,6 +4,8 @@ import nodemailer from 'nodemailer';
 import jwt from "jsonwebtoken";
 dotenv.config();
 
+const JWT_SECRET = process.env.JWT_SECRET;
+
 
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
@@ -45,7 +47,6 @@ export const sendOTP = async (req, res) => {
 
         await user.save();
 
-
         const mailOptions = {
             from: process.env.SMTP_USER,
             to: email,
@@ -54,7 +55,6 @@ export const sendOTP = async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
-
         res.status(200).json({ message: "OTP sent successfully" });
 
     } catch (error) {
@@ -63,19 +63,13 @@ export const sendOTP = async (req, res) => {
 };
 
 
-
-
-
-
 export const verifyOTP = async (req, res) => {
     try {
         const { phone, otp } = req.body;
 
         const user = await User.findOne({ phone });
 
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
+        if (!user) { return res.status(404).json({ message: "User not found" }); }
 
         if (!user.otp || user.otp !== otp || user.otpExpiresAt < new Date()) {
             return res.status(400).json({ message: "Invalid or expired OTP" });
@@ -87,14 +81,8 @@ export const verifyOTP = async (req, res) => {
         user.otpExpiresAt = undefined;
         await user.save();
 
-        // Generate JWT token valid for 10 days
-        const token = jwt.sign(
-            { userId: user._id, phone: user.phone },
-            process.env.JWT_SECRET,
-            { expiresIn: "10d" }
-        );
-
-        res.status(200).json({ message: "OTP verified successfully", token });
+        const token = jwt.sign({ userId: user._id, phone: user.phone }, JWT_SECRET, { expiresIn: "10d" });
+        res.status(200).json({ message: "OTP verified successfully", token, userId: user._id });
 
     } catch (error) {
         res.status(500).json({ message: "Error verifying OTP", error: error.message });
@@ -127,3 +115,22 @@ export const getBlockedUsers = async (req, res) => {
 
 
 
+const authenticateToken = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Unauthorized: No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        if (!user) { return res.status(404).json({ message: "User not found" }); }
+        req.user = user;
+        next();
+    } catch (error) {
+        return res.status(403).json({ message: "Forbidden: Invalid token" });
+    }
+};
