@@ -4,7 +4,8 @@ const UserSchema = new mongoose.Schema({
     phone: {
         type: String,
         required: true,
-        unique: true
+        unique: true,
+        index: true,
     },
     email: {
         type: String,
@@ -33,13 +34,27 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Group"
     }],
-
+    friends: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"
+    }],
+    friendRequests: [{
+        sender: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
+        status: {
+            type: String,
+            enum: ["pending", "accepted", "declined"],
+            default: "pending"
+        }
+    }],
     otp: {
         type: String
     },
     otpExpiresAt: {
         type: Date
     },
-});
+}, { timestamps: true });
 
 export default mongoose.model("User", UserSchema);
