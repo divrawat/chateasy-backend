@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import User from "../models/user.js";
 import nodemailer from 'nodemailer';
+import jwt from "jsonwebtoken";
 dotenv.config();
 
 
@@ -66,7 +67,6 @@ export const sendOTP = async (req, res) => {
 
 
 
-// Verify OTP
 export const verifyOTP = async (req, res) => {
     try {
         const { phone, otp } = req.body;
@@ -81,12 +81,20 @@ export const verifyOTP = async (req, res) => {
             return res.status(400).json({ message: "Invalid or expired OTP" });
         }
 
+        // Mark user as verified
         user.isVerified = true;
         user.otp = undefined;
         user.otpExpiresAt = undefined;
         await user.save();
 
-        res.status(200).json({ message: "OTP verified successfully" });
+        // Generate JWT token valid for 10 days
+        const token = jwt.sign(
+            { userId: user._id, phone: user.phone },
+            process.env.JWT_SECRET,
+            { expiresIn: "10d" }
+        );
+
+        res.status(200).json({ message: "OTP verified successfully", token });
 
     } catch (error) {
         res.status(500).json({ message: "Error verifying OTP", error: error.message });
