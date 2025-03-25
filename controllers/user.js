@@ -126,21 +126,27 @@ export const getBlockedUsers = async (req, res) => {
 
 export const FriendRequest = async (req, res) => {
     try {
-        const { senderPhone, receiverPhone } = req.body;
+        const { senderId, receiverId } = req.body;
 
-        if (!senderPhone || !receiverPhone) {
-            return res.status(400).json({ message: "Both sender and receiver phone numbers are required." });
+        if (!senderId || !receiverId) {
+            return res.status(400).json({ message: "Both sender and receiver IDs are required." });
         }
 
-        const sender = await User.findOne({ phone: senderPhone });
-        const receiver = await User.findOne({ phone: receiverPhone });
+        const sender = await User.findById(senderId);
+        const receiver = await User.findById(receiverId);
 
-        if (!sender || !receiver) { return res.status(404).json({ message: "User not found." }); }
+        if (!sender || !receiver) {
+            return res.status(404).json({ message: "User not found." });
+        }
 
         // Check if request already exists
-        const existingRequest = receiver.friendRequests.find((req) => req.sender.toString() === sender._id.toString());
+        const existingRequest = receiver.friendRequests.find(
+            (req) => req.sender.toString() === sender._id.toString()
+        );
 
-        if (existingRequest) { return res.status(400).json({ message: "Friend request already sent." }); }
+        if (existingRequest) {
+            return res.status(400).json({ message: "Friend request already sent." });
+        }
 
         receiver.friendRequests.push({ sender: sender._id, status: "pending" });
         await receiver.save();
@@ -149,7 +155,8 @@ export const FriendRequest = async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
     }
-}
+};
+
 
 
 export const GetUsers = async (req, res) => {
