@@ -159,7 +159,7 @@ export const GetUsers = async (req, res) => {
         const { search } = req.query;
         const query = { $or: [{ phone: { $regex: search, $options: "i" } }] };
         const skip = (page - 1) * perPage;
-        const data = await User.find(query).sort({ createdAt: -1 }).skip(skip).limit(perPage).exec();
+        const data = await User.find(query).select("name phone photo description").sort({ createdAt: -1 }).skip(skip).limit(perPage).exec();
         res.json({
             status: true,
             message: 'All Users Fetched Successfully',
