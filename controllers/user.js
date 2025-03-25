@@ -124,6 +124,49 @@ export const getBlockedUsers = async (req, res) => {
 };
 
 
+export const FriendRequest = async (req, res) => {
+    try {
+        const { senderPhone, receiverPhone } = req.body;
+
+        if (!senderPhone || !receiverPhone) {
+            return res.status(400).json({ message: "Both sender and receiver phone numbers are required." });
+        }
+
+        const sender = await User.findOne({ phone: senderPhone });
+        const receiver = await User.findOne({ phone: receiverPhone });
+
+        if (!sender || !receiver) { return res.status(404).json({ message: "User not found." }); }
+
+        // Check if request already exists
+        const existingRequest = receiver.friendRequests.find((req) => req.sender.toString() === sender._id.toString());
+
+        if (existingRequest) { return res.status(400).json({ message: "Friend request already sent." }); }
+
+        receiver.friendRequests.push({ sender: sender._id, status: "pending" });
+        await receiver.save();
+
+        res.status(200).json({ message: "Friend request sent successfully." });
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+}
+
+
+export const GetUsers = async (req, res) => {
+    try {
+        const page = Number(req.query.page) || 1;
+        const perPage = 20;
+        const { search } = req.query;
+        const query = { $or: [{ phone: { $regex: search, $options: "i" } }] };
+        const skip = (page - 1) * perPage;
+        const data = await User.find(query).sort({ createdAt: -1 }).skip(skip).limit(perPage).exec();
+        res.json({
+            status: true,
+            message: 'All Users Fetched Successfully',
+            users: data
+        });
+    } catch (err) { console.error('Error fetching Users:', err); res.status(500).json({ error: 'Internal Server Error' }); }
+};
 
 
 const authenticateToken = async (req, res, next) => {
