@@ -135,18 +135,13 @@ export const FriendRequest = async (req, res) => {
         const sender = await User.findById(senderId);
         const receiver = await User.findById(receiverId);
 
-        if (!sender || !receiver) {
-            return res.status(404).json({ message: "User not found." });
-        }
+        if (!sender || !receiver) { return res.status(404).json({ message: "User not found." }); }
 
-        // Check if request already exists
         const existingRequest = receiver.friendRequests.find(
             (req) => req.sender.toString() === sender._id.toString()
         );
 
-        if (existingRequest) {
-            return res.status(400).json({ message: "Friend request already sent." });
-        }
+        if (existingRequest) { return res.status(400).json({ message: "Friend request already sent." }); }
 
         receiver.friendRequests.push({ sender: sender._id, status: "pending" });
         await receiver.save();
@@ -166,7 +161,7 @@ export const GetUsers = async (req, res) => {
         const { search } = req.query;
         const query = { $or: [{ phone: { $regex: search, $options: "i" } }] };
         const skip = (page - 1) * perPage;
-        const data = await User.find(query).select("name phone photo description friends").sort({ createdAt: -1 }).skip(skip).limit(perPage).exec();
+        const data = await User.find(query).select("name phone photo description friends friendRequests").sort({ createdAt: -1 }).skip(skip).limit(perPage).exec();
         res.json({
             status: true,
             message: 'All Users Fetched Successfully',
