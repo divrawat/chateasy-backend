@@ -94,13 +94,39 @@ export const fetchUser = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        const user = await User.findById(userId).populate("friendRequests", "name email profilePic");
-        if (!user) { return res.status(404).json({ message: "User not found" }); }
+        // Fetch user and populate friendRequests.sender to get sender details
+        const user = await User.findById(userId)
+            .populate({
+                path: "friendRequests.sender",
+                select: "name email photo phone", // Fetch necessary fields
+            });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
 
         res.status(200).json({
             message: "User Fetched Successfully",
-            user,
-            friendRequests: user.friendRequests,
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                photo: user.photo,
+                description: user.description,
+                isVerified: user.isVerified,
+            },
+            friendRequests: user.friendRequests.map(request => ({
+                _id: request._id,
+                status: request.status,
+                sender: request.sender ? {
+                    _id: request.sender._id,
+                    name: request.sender.name,
+                    email: request.sender.email,
+                    phone: request.sender.phone,
+                    photo: request.sender.photo
+                } : null
+            })),
         });
     } catch (error) {
         res.status(500).json({
