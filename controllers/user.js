@@ -93,14 +93,23 @@ export const verifyOTP = async (req, res) => {
 export const fetchUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const user = await User.findById(userId);
+
+        const user = await User.findById(userId).populate("friendRequests", "name email profilePic");
         if (!user) { return res.status(404).json({ message: "User not found" }); }
-        res.status(200).json({ message: "User Fetched Successfully", user });
+
+        res.status(200).json({
+            message: "User Fetched Successfully",
+            user,
+            friendRequests: user.friendRequests,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Something Went Wrong",
+            error: error.message,
+        });
     }
-    catch (error) {
-        res.status(500).json({ message: "Something Went Wrong", error: error.message });
-    }
-}
+};
+
 
 
 
