@@ -94,11 +94,15 @@ export const fetchUser = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        // Fetch user and populate friendRequests.sender to get sender details
+        // Fetch user, populate friendRequests.sender and friends
         const user = await User.findById(userId)
             .populate({
                 path: "friendRequests.sender",
-                select: "name email photo phone", // Fetch necessary fields
+                select: "name email photo phone",
+            })
+            .populate({
+                path: "friends",
+                select: "name email photo phone", // Select fields you want from friends
             });
 
         if (!user) {
@@ -127,6 +131,13 @@ export const fetchUser = async (req, res) => {
                     photo: request.sender.photo
                 } : null
             })),
+            friends: user.friends.map(friend => ({
+                _id: friend._id,
+                name: friend.name,
+                email: friend.email,
+                phone: friend.phone,
+                photo: friend.photo
+            })),
         });
     } catch (error) {
         res.status(500).json({
@@ -135,6 +146,7 @@ export const fetchUser = async (req, res) => {
         });
     }
 };
+
 
 
 
