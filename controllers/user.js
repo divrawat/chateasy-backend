@@ -94,7 +94,6 @@ export const fetchUser = async (req, res) => {
     try {
         const { userId } = req.params;
 
-        // Fetch user, populate friendRequests.sender and friends
         const user = await User.findById(userId)
             .populate({
                 path: "friendRequests.sender",
@@ -102,7 +101,7 @@ export const fetchUser = async (req, res) => {
             })
             .populate({
                 path: "friends",
-                select: "name email photo phone", // Select fields you want from friends
+                select: "name email photo phone",
             });
 
         if (!user) {
@@ -218,7 +217,44 @@ export const GetUsers = async (req, res) => {
 };
 
 
-const authenticateToken = async (req, res, next) => {
+
+export const HandleFriendRequests = async (req, res) => {
+    try {
+
+        const { action, userId, senderId } = req.body;
+
+        if (!userId || !senderId || !["accept", "reject"].includes(action)) {
+            return res.status(400).json({ message: "Invalid request data" });
+        }
+
+        const friendRequest = await FriendRequest.findOne({
+            sender: senderId,
+            receiver: userId,
+            status: "pending"
+        });
+
+        if (!friendRequest) {
+            return res.status(404).json({ message: "Friend request not found" });
+        }
+
+        if (action === "accept") {
+
+            await User.findByIdAndUpdate(userId, { $push: { friends: senderId } });
+            await User.findByIdAndUpdate(senderId, { $push: { friends: userId } });
+        }
+
+        await FriendRequest.deleteOne({ _id: friendRequest._id });
+
+        return res.json({ message: `Friend request ${action}ed successfully` });
+    } catch (error) {
+        console.error("Error processing friend request:", error);
+        return res.status(500).json({ message: "Internal server error" });
+    }
+}
+
+
+
+export const authenticateToken = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
