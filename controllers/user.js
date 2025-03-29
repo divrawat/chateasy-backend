@@ -199,7 +199,7 @@ export const FriendRequest = async (req, res) => {
 };
 
 
-export const UnFriendRequest = async () => {
+export const UnFriendRequest = async (req, res) => {
     try {
         const { senderId, receiverId } = req.body;
 
