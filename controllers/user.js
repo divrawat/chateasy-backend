@@ -253,7 +253,6 @@ export const HandleFriendRequests = async (req, res) => {
             return res.status(400).json({ message: "Invalid request data" });
         }
 
-        // Find both users
         const [user, sender] = await Promise.all([
             User.findById(userId),
             User.findById(senderId),
@@ -294,6 +293,27 @@ export const HandleFriendRequests = async (req, res) => {
     }
 };
 
+
+export const getAllFriendRequests = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        if (!userId) {
+            return res.status(400).json({ message: "User ID is required" });
+        }
+
+        const user = await User.findById(userId).populate("friendRequests.sender", "name email photo");
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(200).json({ friendRequests: user.friendRequests });
+    } catch (error) {
+        console.error("Error fetching friend requests:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
 
 
 export const authenticateToken = async (req, res, next) => {
