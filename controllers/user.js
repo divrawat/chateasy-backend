@@ -302,7 +302,7 @@ export const getAllFriendRequests = async (req, res) => {
             return res.status(400).json({ message: "User ID is required" });
         }
 
-        const user = await User.findById(userId).populate("friendRequests.sender", "name email photo");
+        const user = await User.findById(userId).populate("friendRequests.sender", "name email photo phone");
 
         if (!user) {
             return res.status(404).json({ message: "User not found" });
