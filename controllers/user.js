@@ -2,7 +2,27 @@ import dotenv from "dotenv";
 import User from "../models/user.js";
 import nodemailer from 'nodemailer';
 import jwt from "jsonwebtoken";
+import multer from "multer";
+import fs from 'fs';
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 dotenv.config();
+
+export const upload = multer({ dest: "uploads/" });
+const s3Client = new S3Client({
+    region: process.env.R2_REGION,
+    endpoint: process.env.R2_ENDPOINT,
+    credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID,
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY
+    }
+});
+
+
+
+
+
+
+
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -334,5 +354,37 @@ export const authenticateToken = async (req, res, next) => {
         next();
     } catch (error) {
         return res.status(403).json({ message: "Forbidden: Invalid token" });
+    }
+};
+
+
+
+
+
+
+
+
+export const uploadFile = async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const fileStream = fs.createReadStream(req.file.path);
+    const key = `uploads/${Date.now()}-${req.file.originalname}`;
+
+    try {
+        const uploadParams = {
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: key,
+            Body: fileStream,
+            ContentType: req.file.mimetype
+        };
+
+        await s3Client.send(new PutObjectCommand(uploadParams));
+
+        fs.unlinkSync(req.file.path);
+
+        res.json({ url: `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET_NAME}/${key}` });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: "Upload failed" });
     }
 };
