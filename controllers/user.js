@@ -248,28 +248,31 @@ export const GetUsers = async (req, res) => {
 export const HandleFriendRequests = async (req, res) => {
     try {
         const { action, userId, senderId } = req.body;
+        console.log(action, userId, senderId);
+
+        const user3 = await User.findById(senderId);
+        console.log('user000', user3);
+
+
+
 
         if (!userId || !senderId || !["accept", "reject"].includes(action)) {
             return res.status(400).json({ message: "Invalid request data" });
         }
 
-        const [user, sender] = await Promise.all([
-            User.findById(userId),
-            User.findById(senderId),
-        ]);
+        const [user, sender] = await Promise.all([User.findById(userId), User.findById(senderId),]);
 
-        if (!user || !sender) {
-            return res.status(404).json({ message: "User or sender not found" });
-        }
+
+
+
+        if (!user || !sender) { return res.status(404).json({ message: "User or sender not found" }); }
 
         // Check if the friend request exists
         const friendRequest = user.friendRequests.find(
             (req) => req.sender.toString() === senderId && req.status === "pending"
         );
 
-        if (!friendRequest) {
-            return res.status(404).json({ message: "Friend request not found" });
-        }
+        if (!friendRequest) { return res.status(404).json({ message: "Friend request not found" }); }
 
         if (action === "accept") {
             // Ensure they are not already friends
@@ -282,9 +285,7 @@ export const HandleFriendRequests = async (req, res) => {
         }
 
         // Remove the friend request from both users
-        await User.findByIdAndUpdate(userId, {
-            $pull: { friendRequests: { sender: senderId } },
-        });
+        await User.findByIdAndUpdate(userId, { $pull: { friendRequests: { sender: senderId } }, });
 
         return res.json({ message: `Friend request ${action}ed successfully` });
     } catch (error) {
