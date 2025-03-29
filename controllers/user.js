@@ -199,6 +199,33 @@ export const FriendRequest = async (req, res) => {
 };
 
 
+export const UnFriendRequest = async () => {
+    try {
+        const { senderId, receiverId } = req.body;
+
+        if (!senderId || !receiverId) {
+            return res.status(400).json({ message: "Both sender and receiver IDs are required." });
+        }
+
+        const receiver = await User.findById(receiverId);
+
+        if (!receiver) {
+            return res.status(404).json({ message: "Receiver not found." });
+        }
+
+        // Remove the friend request sent by senderId
+        receiver.friendRequests = receiver.friendRequests.filter(
+            (req) => req.sender.toString() !== senderId
+        );
+
+        await receiver.save();
+
+        res.status(200).json({ message: "Friend request canceled successfully." });
+    } catch (error) {
+        res.status(500).json({ message: "Server error", error: error.message });
+    }
+}
+
 
 export const GetUsers = async (req, res) => {
     try {
@@ -220,37 +247,52 @@ export const GetUsers = async (req, res) => {
 
 export const HandleFriendRequests = async (req, res) => {
     try {
-
         const { action, userId, senderId } = req.body;
 
         if (!userId || !senderId || !["accept", "reject"].includes(action)) {
             return res.status(400).json({ message: "Invalid request data" });
         }
 
-        const friendRequest = await FriendRequest.findOne({
-            sender: senderId,
-            receiver: userId,
-            status: "pending"
-        });
+        // Find both users
+        const [user, sender] = await Promise.all([
+            User.findById(userId),
+            User.findById(senderId),
+        ]);
+
+        if (!user || !sender) {
+            return res.status(404).json({ message: "User or sender not found" });
+        }
+
+        // Check if the friend request exists
+        const friendRequest = user.friendRequests.find(
+            (req) => req.sender.toString() === senderId && req.status === "pending"
+        );
 
         if (!friendRequest) {
             return res.status(404).json({ message: "Friend request not found" });
         }
 
         if (action === "accept") {
-
-            await User.findByIdAndUpdate(userId, { $push: { friends: senderId } });
-            await User.findByIdAndUpdate(senderId, { $push: { friends: userId } });
+            // Ensure they are not already friends
+            if (!user.friends.includes(senderId)) {
+                await Promise.all([
+                    User.findByIdAndUpdate(userId, { $push: { friends: senderId } }),
+                    User.findByIdAndUpdate(senderId, { $push: { friends: userId } }),
+                ]);
+            }
         }
 
-        await FriendRequest.deleteOne({ _id: friendRequest._id });
+        // Remove the friend request from both users
+        await User.findByIdAndUpdate(userId, {
+            $pull: { friendRequests: { sender: senderId } },
+        });
 
         return res.json({ message: `Friend request ${action}ed successfully` });
     } catch (error) {
         console.error("Error processing friend request:", error);
         return res.status(500).json({ message: "Internal server error" });
     }
-}
+};
 
 
 
