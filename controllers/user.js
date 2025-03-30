@@ -2,10 +2,13 @@ import dotenv from "dotenv";
 import User from "../models/user.js";
 import nodemailer from 'nodemailer';
 import jwt from "jsonwebtoken";
+dotenv.config();
+
+/*
 import multer from "multer";
 import fs from 'fs';
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
-dotenv.config();
+
 
 export const upload = multer({ dest: "uploads/" });
 const s3Client = new S3Client({
@@ -17,7 +20,7 @@ const s3Client = new S3Client({
     }
 });
 
-
+*/
 
 
 
@@ -362,7 +365,7 @@ export const authenticateToken = async (req, res, next) => {
 
 
 
-
+/*
 
 export const uploadFile = async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
@@ -388,3 +391,5 @@ export const uploadFile = async (req, res) => {
         res.status(500).json({ error: "Upload failed" });
     }
 };
+
+*/
