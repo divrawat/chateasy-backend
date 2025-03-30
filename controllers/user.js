@@ -8,7 +8,6 @@ import multer from "multer";
 const storage = multer.memoryStorage()
 export const upload = multer({ storage });
 
-
 const s3Client = new S3Client({
     region: process.env.R2_REGION,
     endpoint: process.env.R2_ENDPOINT,
@@ -359,32 +358,32 @@ export const authenticateToken = async (req, res, next) => {
 };
 
 
-
-
-
-
-
 export const uploadFile = async (req, res) => {
-    if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-    }
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
 
-    const key = `uploads/${Date.now()}-${req.file.originalname}`;
+    const key = `${Date.now()}-${req.file.originalname}`;
+    const fileStream = fs.createReadStream(req.file.path);
 
     try {
         const uploadParams = {
             Bucket: process.env.R2_BUCKET_NAME,
-            Key: key,
-            Body: req.file.buffer, // ✅ Use buffer instead of fs.createReadStream
+            Key: `uploads/${key}`,
+            Body: fileStream,
             ContentType: req.file.mimetype,
+            ACL: "public-read", // Ensure public access
         };
 
         await s3Client.send(new PutObjectCommand(uploadParams));
 
-        res.json({ url: `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET_NAME}/${key}` });
+        // Clean up temporary file
+        fs.unlinkSync(req.file.path);
+
+        // Construct URL using R2_DEV_URL from .env
+        const fileUrl = `${process.env.R2_DEV_URL}${key}`;
+
+        res.json({ url: fileUrl });
     } catch (error) {
-        console.error(error);
+        console.error("Upload Error:", error);
         res.status(500).json({ error: "Upload failed" });
     }
 };
-
