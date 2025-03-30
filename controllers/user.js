@@ -3,14 +3,12 @@ import User from "../models/user.js";
 import nodemailer from 'nodemailer';
 import jwt from "jsonwebtoken";
 dotenv.config();
-
-/*
-import multer from "multer";
-import fs from 'fs';
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
+import multer from "multer";
+const storage = multer.memoryStorage()
+export const upload = multer({ storage });
 
 
-export const upload = multer({ dest: "uploads/" });
 const s3Client = new S3Client({
     region: process.env.R2_REGION,
     endpoint: process.env.R2_ENDPOINT,
@@ -20,7 +18,7 @@ const s3Client = new S3Client({
     }
 });
 
-*/
+
 
 
 
@@ -365,25 +363,23 @@ export const authenticateToken = async (req, res, next) => {
 
 
 
-/*
 
 export const uploadFile = async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+    if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+    }
 
-    const fileStream = fs.createReadStream(req.file.path);
     const key = `uploads/${Date.now()}-${req.file.originalname}`;
 
     try {
         const uploadParams = {
             Bucket: process.env.R2_BUCKET_NAME,
             Key: key,
-            Body: fileStream,
-            ContentType: req.file.mimetype
+            Body: req.file.buffer, // ✅ Use buffer instead of fs.createReadStream
+            ContentType: req.file.mimetype,
         };
 
         await s3Client.send(new PutObjectCommand(uploadParams));
-
-        fs.unlinkSync(req.file.path);
 
         res.json({ url: `${process.env.R2_ENDPOINT}/${process.env.R2_BUCKET_NAME}/${key}` });
     } catch (error) {
@@ -392,4 +388,3 @@ export const uploadFile = async (req, res) => {
     }
 };
 
-*/
