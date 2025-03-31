@@ -423,7 +423,7 @@ export const uploadFile = async (req, res) => {
 
 
 export const uploadFile = async (req, res) => {
-    const { userId, name, description, phone } = req.body;
+    const { userId, name, description, phone, email } = req.body;
     if (!userId) return res.status(400).json({ error: "User ID is required" });
 
     try {
@@ -448,6 +448,7 @@ export const uploadFile = async (req, res) => {
         if (name) updateFields.name = name;
         if (description) updateFields.description = description;
         if (phone) updateFields.phone = phone;
+        if (email) updateFields.email = email;
         if (fileUrl) updateFields.photo = fileUrl;
 
         const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true });
