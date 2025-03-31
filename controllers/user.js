@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 dotenv.config();
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import multer from "multer";
+
 const storage = multer.memoryStorage()
 export const upload = multer({ storage });
 
@@ -358,30 +359,102 @@ export const authenticateToken = async (req, res, next) => {
 };
 
 
+/*
 export const uploadFile = async (req, res) => {
     if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
     const key = `${Date.now()}-${req.file.originalname}`;
-    const fileStream = fs.createReadStream(req.file.path);
-
     try {
         const uploadParams = {
             Bucket: process.env.R2_BUCKET_NAME,
             Key: `uploads/${key}`,
-            Body: fileStream,
+            Body: req.file.buffer, // Use req.file.buffer directly
             ContentType: req.file.mimetype,
-            ACL: "public-read", // Ensure public access
+            ACL: "public-read",
+        };
+
+        await s3Client.send(new PutObjectCommand(uploadParams));
+        const fileUrl = `${process.env.R2_DEV_URL}${key}`;
+
+        res.json({ url: fileUrl });
+    } catch (error) {
+        console.error("Upload Error:", error);
+        res.status(500).json({ error: "Upload failed" });
+    }
+};
+*/
+
+
+
+/*
+export const uploadFile = async (req, res) => {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    const { userId, name, description, phone } = req.body;
+    if (!userId) return res.status(400).json({ error: "User ID is required" });
+    const key = `${Date.now()}-${req.file.originalname}`;
+
+    try {
+
+        const uploadParams = {
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: `uploads/${key}`,
+            Body: req.file.buffer,
+            ContentType: req.file.mimetype,
+            ACL: "public-read",
         };
 
         await s3Client.send(new PutObjectCommand(uploadParams));
 
-        // Clean up temporary file
-        fs.unlinkSync(req.file.path);
-
-        // Construct URL using R2_DEV_URL from .env
         const fileUrl = `${process.env.R2_DEV_URL}${key}`;
+        const updatedUser = await User.findByIdAndUpdate(userId, { name, photo: fileUrl, description, phone }, { new: true });
+        if (!updatedUser) { return res.status(404).json({ error: "User not found" }); }
 
-        res.json({ url: fileUrl });
+        res.json({ message: "Profile updated successfully!", user: updatedUser });
+    } catch (error) {
+        console.error("Upload Error:", error);
+        res.status(500).json({ error: "Upload failed" });
+    }
+};
+*/
+
+
+
+
+
+
+export const uploadFile = async (req, res) => {
+    const { userId, name, description, phone } = req.body;
+    if (!userId) return res.status(400).json({ error: "User ID is required" });
+
+    try {
+        let fileUrl = '';
+
+        if (req.file) {
+            const key = `${Date.now()}-${req.file.originalname}`;
+
+            const uploadParams = {
+                Bucket: process.env.R2_BUCKET_NAME,
+                Key: `uploads/${key}`,
+                Body: req.file.buffer,
+                ContentType: req.file.mimetype,
+                ACL: "public-read",
+            };
+
+            await s3Client.send(new PutObjectCommand(uploadParams));
+            fileUrl = `${process.env.R2_DEV_URL}${key}`;
+        }
+
+        const updateFields = {};
+        if (name) updateFields.name = name;
+        if (description) updateFields.description = description;
+        if (phone) updateFields.phone = phone;
+        if (fileUrl) updateFields.photo = fileUrl;
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updateFields, { new: true });
+        if (!updatedUser) return res.status(404).json({ error: "User not found" });
+
+        res.json({ user: updatedUser });
+
     } catch (error) {
         console.error("Upload Error:", error);
         res.status(500).json({ error: "Upload failed" });
