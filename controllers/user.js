@@ -326,9 +326,8 @@ export const getAllFriendRequests = async (req, res) => {
 
         const user = await User.findById(userId).populate("friendRequests.sender", "name email photo phone");
 
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
+        if (!user) { return res.status(404).json({ message: "User not found" }); }
+
 
         res.status(200).json({ friendRequests: user.friendRequests });
     } catch (error) {
@@ -336,88 +335,6 @@ export const getAllFriendRequests = async (req, res) => {
         res.status(500).json({ message: "Internal server error" });
     }
 };
-
-
-export const authenticateToken = async (req, res, next) => {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        return res.status(401).json({ message: "Unauthorized: No token provided" });
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        const user = await User.findById(decoded.userId);
-        if (!user) { return res.status(404).json({ message: "User not found" }); }
-        req.user = user;
-        next();
-    } catch (error) {
-        return res.status(403).json({ message: "Forbidden: Invalid token" });
-    }
-};
-
-
-/*
-export const uploadFile = async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-    const key = `${Date.now()}-${req.file.originalname}`;
-    try {
-        const uploadParams = {
-            Bucket: process.env.R2_BUCKET_NAME,
-            Key: `uploads/${key}`,
-            Body: req.file.buffer, // Use req.file.buffer directly
-            ContentType: req.file.mimetype,
-            ACL: "public-read",
-        };
-
-        await s3Client.send(new PutObjectCommand(uploadParams));
-        const fileUrl = `${process.env.R2_DEV_URL}${key}`;
-
-        res.json({ url: fileUrl });
-    } catch (error) {
-        console.error("Upload Error:", error);
-        res.status(500).json({ error: "Upload failed" });
-    }
-};
-*/
-
-
-
-/*
-export const uploadFile = async (req, res) => {
-    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-
-    const { userId, name, description, phone } = req.body;
-    if (!userId) return res.status(400).json({ error: "User ID is required" });
-    const key = `${Date.now()}-${req.file.originalname}`;
-
-    try {
-
-        const uploadParams = {
-            Bucket: process.env.R2_BUCKET_NAME,
-            Key: `uploads/${key}`,
-            Body: req.file.buffer,
-            ContentType: req.file.mimetype,
-            ACL: "public-read",
-        };
-
-        await s3Client.send(new PutObjectCommand(uploadParams));
-
-        const fileUrl = `${process.env.R2_DEV_URL}${key}`;
-        const updatedUser = await User.findByIdAndUpdate(userId, { name, photo: fileUrl, description, phone }, { new: true });
-        if (!updatedUser) { return res.status(404).json({ error: "User not found" }); }
-
-        res.json({ message: "Profile updated successfully!", user: updatedUser });
-    } catch (error) {
-        console.error("Upload Error:", error);
-        res.status(500).json({ error: "Upload failed" });
-    }
-};
-*/
-
-
 
 
 
@@ -459,5 +376,49 @@ export const uploadFile = async (req, res) => {
     } catch (error) {
         console.error("Upload Error:", error);
         res.status(500).json({ error: "Upload failed" });
+    }
+};
+
+
+
+export const getAllFriends = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        if (!userId) { return res.status(400).json({ message: "User ID is required" }); }
+
+        const user = await User.findById(userId).populate("friends", "name photo phone");
+
+        if (!user) { return res.status(404).json({ message: "User not found" }); }
+
+        res.status(200).json({ friends: user.friends });
+    } catch (error) {
+        console.error("Error fetching friend requests:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+};
+
+
+
+
+
+
+export const authenticateToken = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).json({ message: "Unauthorized: No token provided" });
+    }
+
+    const token = authHeader.split(" ")[1];
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+        if (!user) { return res.status(404).json({ message: "User not found" }); }
+        req.user = user;
+        next();
+    } catch (error) {
+        return res.status(403).json({ message: "Forbidden: Invalid token" });
     }
 };

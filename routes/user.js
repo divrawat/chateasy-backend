@@ -3,7 +3,7 @@ const router = express.Router();
 
 import {
     sendOTP, verifyOTP, getBlockedUsers, fetchUser, GetUsers, FriendRequest, HandleFriendRequests, UnFriendRequest, getAllFriendRequests,
-    upload, uploadFile
+    upload, uploadFile, getAllFriends
 } from "../controllers/user.js"
 
 
@@ -17,6 +17,7 @@ router.post("/upload", upload.single("file"), uploadFile)
 
 router.get("/search-users", GetUsers);
 router.get("/friend-requests/:userId", getAllFriendRequests);
+router.get("/all-friends/:userId", getAllFriends);
 router.get("/user/:userId", fetchUser);
 router.get("/user/:userId/blocked", getBlockedUsers);
 
