@@ -252,17 +252,34 @@ export const GetUsers = async (req, res) => {
     try {
         const page = Number(req.query.page) || 1;
         const perPage = 20;
-        const { search } = req.query;
-        const query = { $or: [{ phone: { $regex: search, $options: "i" } }] };
+        const { search, userId } = req.query; // Get userId from query params
+
+        const query = {
+            $and: [
+                { _id: { $ne: userId } }, // Exclude the logged-in user
+                { $or: [{ phone: { $regex: search, $options: "i" } }] }
+            ]
+        };
+
         const skip = (page - 1) * perPage;
-        const data = await User.find(query).select("name phone photo description friends friendRequests").sort({ createdAt: -1 }).skip(skip).limit(perPage).exec();
+        const data = await User.find(query)
+            .select("name phone photo")
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(perPage)
+            .exec();
+
         res.json({
             status: true,
-            message: 'All Users Fetched Successfully',
+            message: "All Users Fetched Successfully",
             users: data
         });
-    } catch (err) { console.error('Error fetching Users:', err); res.status(500).json({ error: 'Internal Server Error' }); }
+    } catch (err) {
+        console.error("Error fetching Users:", err);
+        res.status(500).json({ error: "Internal Server Error" });
+    }
 };
+
 
 
 
