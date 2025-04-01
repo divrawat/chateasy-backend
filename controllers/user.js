@@ -195,6 +195,8 @@ export const FriendRequest = async (req, res) => {
     try {
         const { senderId, receiverId } = req.body;
 
+        if (senderId == receiverId) { return res.status(400).json({ message: "Both sender and receiver are same person" }); }
+
         if (!senderId || !receiverId) {
             return res.status(400).json({ message: "Both sender and receiver IDs are required." });
         }
@@ -223,6 +225,8 @@ export const FriendRequest = async (req, res) => {
 export const UnFriendRequest = async (req, res) => {
     try {
         const { senderId, receiverId } = req.body;
+
+        if (senderId == receiverId) { return res.status(400).json({ message: "Both sender and receiver are same person" }); }
 
         if (!senderId || !receiverId) {
             return res.status(400).json({ message: "Both sender and receiver IDs are required." });
@@ -287,11 +291,6 @@ export const HandleFriendRequests = async (req, res) => {
     try {
         const { action, userId, senderId } = req.body;
         console.log(action, userId, senderId);
-
-        const user3 = await User.findById(senderId);
-        console.log('user000', user3);
-
-
 
 
         if (!userId || !senderId || !["accept", "reject"].includes(action)) {
