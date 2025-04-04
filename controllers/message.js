@@ -4,45 +4,41 @@ import Notification from "../models/notification.js";
 
 export const sendMessage = async (req, res) => {
     try {
-        const { sender, receiver, group, messageType, messageContent, mediaUrl } = req.body;
+        const { sender, receiver, group, messageType, messageContent } = req.body;
         const io = req.app.get("io");
+
+        if (!io) {
+            console.error("Socket.io not initialized");
+            return res.status(500).json({ message: "Internal server error" });
+        }
 
         const newMessage = new Message({
             sender,
-            receiver: receiver || null,
-            group: group || null,
+            receiver,
+            group,
             messageType,
             messageContent,
-            mediaUrl
         });
 
         await newMessage.save();
 
+        // Convert to object before emitting
+        const messageData = newMessage.toObject();
+
         if (group) {
-            io.to(group).emit("newMessage", newMessage);
+            io.to(group).emit("loadMessages", [messageData]);
         } else {
-            io.to(sender).emit("newMessage", newMessage);
-            io.to(receiver).emit("newMessage", newMessage);
+            io.to(sender).emit("loadMessages", [messageData]);
+            io.to(receiver).emit("loadMessages", [messageData]);
         }
 
-        if (receiver) {
-            const newNotification = new Notification({
-                user: receiver,
-                sender: sender,
-                chat: group || null,
-                message: newMessage._id
-            });
-
-            await newNotification.save();
-            io.to(receiver).emit("newNotification", newNotification);
-        }
-
-        res.status(201).json(newMessage);
+        res.status(201).json(messageData);
     } catch (error) {
         console.error("Error sending message:", error);
         res.status(500).json({ message: "Internal server error" });
     }
 };
+
 
 
 
