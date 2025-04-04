@@ -20,6 +20,8 @@ const io = new Server(server, {
     }
 });
 
+app.set("io", io);
+
 app.use(morgan('dev'));
 app.use(cors());
 app.use(bodyParser.json());
