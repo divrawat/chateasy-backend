@@ -3,7 +3,7 @@ const router = express.Router();
 
 import {
     sendOTP, verifyOTP, getBlockedUsers, fetchUser, GetUsers, FriendRequest, HandleFriendRequests, UnFriendRequest, getAllFriendRequests,
-    upload, uploadFile, getAllFriends
+    upload, uploadFile, getAllFriends, clearAllFriendsAndRequests
 } from "../controllers/user.js"
 
 
@@ -20,6 +20,21 @@ router.get("/friend-requests/:userId", getAllFriendRequests);
 router.get("/all-friends/:userId", getAllFriends);
 router.get("/user/:userId", fetchUser);
 router.get("/user/:userId/blocked", getBlockedUsers);
+
+
+
+router.post('/update-token', async (req, res) => {
+    const { userId, expoPushToken } = req.body;
+    try {
+        await User.findByIdAndUpdate(userId, { expoPushToken });
+        res.status(200).json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+
+router.get("/clear-friends-and-requests", clearAllFriendsAndRequests);
 
 
 export default router;

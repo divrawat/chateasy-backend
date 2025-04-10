@@ -5,6 +5,12 @@ import jwt from "jsonwebtoken";
 dotenv.config();
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import multer from "multer";
+import Message from '../models/message.js'
+import crypto from "crypto";
+
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+const IV_LENGTH = 16;
+
 
 const storage = multer.memoryStorage()
 export const upload = multer({ storage });
@@ -19,7 +25,22 @@ const s3Client = new S3Client({
 });
 
 
-
+export const decrypt = (text) => {
+    if (!text || typeof text !== "string") return text;
+    try {
+        const [ivHex, encryptedText] = text.split(":");
+        if (!ivHex || !encryptedText) return text;
+        const iv = Buffer.from(ivHex, "hex");
+        const encryptedBuffer = Buffer.from(encryptedText, "hex");
+        const decipher = crypto.createDecipheriv("aes-256-cbc", Buffer.from(ENCRYPTION_KEY), iv);
+        let decrypted = decipher.update(encryptedBuffer, "hex", "utf8");
+        decrypted += decipher.final("utf8");
+        return decrypted;
+    } catch (error) {
+        console.error("Decryption error:", error);
+        return text;
+    }
+};
 
 
 
@@ -111,6 +132,8 @@ export const verifyOTP = async (req, res) => {
 };
 
 
+
+/*
 export const fetchUser = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -166,8 +189,83 @@ export const fetchUser = async (req, res) => {
         });
     }
 };
+*/
 
+export const fetchUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
 
+        const user = await User.findById(userId)
+            .populate({
+                path: "friendRequests.sender",
+                select: "name email photo phone",
+            })
+            .populate({
+                path: "friends",
+                select: "name email photo phone",
+            });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        const friendsWithMessages = await Promise.all(
+            user.friends.map(async (friend) => {
+                const lastMessage = await Message.findOne({
+                    $or: [
+                        { sender: user._id, receiver: friend._id },
+                        { sender: friend._id, receiver: user._id },
+                    ],
+                })
+                    .sort({ createdAt: -1 })
+                    .select("messageContent createdAt")
+                    .lean();
+
+                return {
+                    _id: friend._id,
+                    name: friend.name,
+                    email: friend.email,
+                    phone: friend.phone,
+                    photo: friend.photo,
+                    lastMessage: lastMessage?.messageContent ? decrypt(lastMessage.messageContent) : null,
+                    lastMessageTime: lastMessage?.createdAt || null,
+                };
+            })
+        );
+
+        res.status(200).json({
+            message: "User Fetched Successfully",
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                photo: user.photo,
+                description: user.description,
+                isVerified: user.isVerified,
+            },
+            friendRequests: user.friendRequests.map((request) => ({
+                _id: request._id,
+                status: request.status,
+                sender: request.sender
+                    ? {
+                        _id: request.sender._id,
+                        name: request.sender.name,
+                        email: request.sender.email,
+                        phone: request.sender.phone,
+                        photo: request.sender.photo,
+                    }
+                    : null,
+            })),
+            friends: friendsWithMessages,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Something Went Wrong",
+            error: error.message,
+        });
+    }
+};
 
 
 
@@ -435,5 +533,26 @@ export const authenticateToken = async (req, res, next) => {
         next();
     } catch (error) {
         return res.status(403).json({ message: "Forbidden: Invalid token" });
+    }
+};
+
+
+
+
+
+export const clearAllFriendsAndRequests = async (req, res) => {
+    try {
+        // Set friends and friendRequests to empty arrays for all users
+        await User.updateMany({}, {
+            $set: {
+                friends: [],
+                friendRequests: []
+            }
+        });
+
+        res.status(200).json({ message: "All friends and friend requests cleared for all users." });
+    } catch (error) {
+        console.error("Error clearing friends and friend requests:", error);
+        res.status(500).json({ error: "Internal server error" });
     }
 };

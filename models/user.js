@@ -58,6 +58,10 @@ const UserSchema = new mongoose.Schema({
     otpExpiresAt: {
         type: Date
     },
+    expoPushToken: {
+        type: String,
+        default: null
+    }
 }, { timestamps: true });
 
 export default mongoose.model("User", UserSchema);

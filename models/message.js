@@ -14,7 +14,7 @@ const encrypt = (text) => {
         return `${iv.toString("hex")}:${encrypted}`;
     } catch (error) {
         console.error("Encryption failed:", error);
-        return text; // Fallback to plaintext if encryption fails
+        return text;
     }
 };
 
@@ -58,13 +58,13 @@ const MessageSchema = new mongoose.Schema({
             return !this.receiver;
         }
     },
-    messageType: {
+    type: {
         type: String,
-        enum: ["text", "image", "video", "audio", "file", "gif"],
+        enum: ["text", "image", "video", "audio", "file", "gif", 'document'],
         default: "text"
     },
     messageContent: {
-        type: String,
+        type: mongoose.Schema.Types.Mixed,
         required: true,
         set: encrypt,
         get: decrypt
