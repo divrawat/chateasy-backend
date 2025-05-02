@@ -22,6 +22,19 @@ const io = new Server(server, {
 
 app.set("io", io);
 
+
+io.on("connection", (socket) => {
+    socket.on("joinRoom", (roomId) => {
+        socket.join(roomId);
+        // console.log(`Joined room: ${roomId}`);
+    });
+
+    socket.on("disconnect", () => { console.log("User disconnected:", socket.id); });
+});
+
+
+
+
 app.use(morgan('dev'));
 app.use(cors());
 app.use(bodyParser.json());

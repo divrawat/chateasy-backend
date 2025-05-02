@@ -33,6 +33,10 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"
     }],
+    groups: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Group"
+    }],
     mutedGroups: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Group"
@@ -58,10 +62,6 @@ const UserSchema = new mongoose.Schema({
     otpExpiresAt: {
         type: Date
     },
-    expoPushToken: {
-        type: String,
-        default: null
-    }
 }, { timestamps: true });
 
 export default mongoose.model("User", UserSchema);

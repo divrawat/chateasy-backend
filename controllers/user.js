@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import User from "../models/user.js";
+import Group from '../models/group.js'
 import nodemailer from 'nodemailer';
 import jwt from "jsonwebtoken";
 dotenv.config();
@@ -7,6 +8,7 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import multer from "multer";
 import Message from '../models/message.js'
 import crypto from "crypto";
+import { log } from "console";
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 const IV_LENGTH = 16;
@@ -66,6 +68,7 @@ const generateOTP = () => Math.floor(1000 + Math.random() * 9000).toString();
 export const sendOTP = async (req, res) => {
     try {
         var { email, phone } = req.body;
+
 
         if (!phone) {
             return res.status(400).json({ message: "Phone number is required" });
@@ -131,66 +134,7 @@ export const verifyOTP = async (req, res) => {
     }
 };
 
-
-
 /*
-export const fetchUser = async (req, res) => {
-    try {
-        const { userId } = req.params;
-
-        const user = await User.findById(userId)
-            .populate({
-                path: "friendRequests.sender",
-                select: "name email photo phone",
-            })
-            .populate({
-                path: "friends",
-                select: "name email photo phone",
-            });
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        res.status(200).json({
-            message: "User Fetched Successfully",
-            user: {
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                phone: user.phone,
-                photo: user.photo,
-                description: user.description,
-                isVerified: user.isVerified,
-            },
-            friendRequests: user.friendRequests.map(request => ({
-                _id: request._id,
-                status: request.status,
-                sender: request.sender ? {
-                    _id: request.sender._id,
-                    name: request.sender.name,
-                    email: request.sender.email,
-                    phone: request.sender.phone,
-                    photo: request.sender.photo
-                } : null
-            })),
-            friends: user.friends.map(friend => ({
-                _id: friend._id,
-                name: friend.name,
-                email: friend.email,
-                phone: friend.phone,
-                photo: friend.photo
-            })),
-        });
-    } catch (error) {
-        res.status(500).json({
-            message: "Something Went Wrong",
-            error: error.message,
-        });
-    }
-};
-*/
-
 export const fetchUser = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -266,6 +210,143 @@ export const fetchUser = async (req, res) => {
         });
     }
 };
+*/
+
+
+export const fetchUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await User.findById(userId)
+            .populate({
+                path: "friendRequests.sender",
+                select: "name email photo phone",
+            })
+            .populate({
+                path: "friends",
+                select: "name email photo phone groups blockedUsers mutedUsers",
+            })
+            .populate({
+                path: "groups",
+                select: "name photo description creator members admins leftUsers",
+            })
+            .populate({
+                path: "mutedGroups",
+                select: "name photo description",
+            })
+            // .populate({
+            //     path: "blockedUsers",
+            //     select: "name phone photo",
+            // })
+            .populate({
+                path: "mutedUsers",
+                select: "name phone photo",
+            });
+
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+
+
+        const friendsWithMessages = await Promise.all(
+
+            user.friends.map(async (friend) => {
+
+                const lastMessage = await Message.findOne({
+                    $or: [
+                        { sender: user._id, receiver: friend._id },
+                        { sender: friend._id, receiver: user._id },
+                    ],
+                }).sort({ createdAt: -1 }).select("messageContent createdAt").lean();
+
+                return {
+                    _id: friend._id,
+                    name: friend.name,
+                    email: friend.email,
+                    phone: friend.phone,
+                    photo: friend.photo,
+                    groups: friend.groups,
+                    blockedUsers: friend.blockedUsers,
+                    mutedUsers: friend.mutedUsers,
+                    lastMessage: lastMessage?.messageContent ? decrypt(lastMessage.messageContent) : null,
+                    lastMessageTime: lastMessage?.createdAt || null,
+                };
+            })
+        );
+
+
+
+
+
+
+        const groupsWithMessages = await Promise.all(
+            user.groups.map(async (group) => {
+                const lastGroupMessage = await Message.findOne({
+                    group: group._id,
+                })
+                    .sort({ createdAt: -1 })
+                    .select("messageContent createdAt")
+                    .lean();
+
+                const populatedMembers = await User.find({ _id: { $in: group.members } }).select("name phone photo").lean();
+                const populatedAdmins = await User.find({ _id: { $in: group.admins } }).select("name phone photo").lean();
+
+                return {
+                    _id: group._id,
+                    name: group.name,
+                    photo: group.photo,
+                    description: group.description,
+                    creator: group.creator,
+                    admins: populatedAdmins,
+                    members: populatedMembers,
+                    lastMessage: lastGroupMessage?.messageContent ? decrypt(lastGroupMessage.messageContent) : null,
+                    lastMessageTime: lastGroupMessage?.createdAt || null,
+                    leftUsers: group.leftUsers
+                };
+            })
+        );
+
+        res.status(200).json({
+            message: "User Fetched Successfully",
+            user: {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                photo: user.photo,
+                description: user.description,
+                isVerified: user.isVerified,
+            },
+            friendRequests: user.friendRequests.map((request) => ({
+                _id: request._id,
+                status: request.status,
+                sender: request.sender
+                    ? {
+                        _id: request.sender._id,
+                        name: request.sender.name,
+                        email: request.sender.email,
+                        phone: request.sender.phone,
+                        photo: request.sender.photo,
+                    }
+                    : null,
+            })),
+            friends: friendsWithMessages,
+            groups: groupsWithMessages,
+            mutedGroups: user.mutedGroups,
+            blockedUsers: user.blockedUsers,
+            mutedUsers: user.mutedUsers,
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: "Something Went Wrong",
+            error: error.message,
+        });
+    }
+};
+
+
+
 
 
 
@@ -313,6 +394,9 @@ export const FriendRequest = async (req, res) => {
         receiver.friendRequests.push({ sender: sender._id, status: "pending" });
         await receiver.save();
 
+        const io = req.app.get("io");
+        io.to(receiverId).emit("friendRequestReceived", { sender: sender });
+
         res.status(200).json({ message: "Friend request sent successfully." });
     } catch (error) {
         res.status(500).json({ message: "Server error", error: error.message });
@@ -331,17 +415,18 @@ export const UnFriendRequest = async (req, res) => {
         }
 
         const receiver = await User.findById(receiverId);
+        const sender = await User.findById(senderId);
 
-        if (!receiver) {
-            return res.status(404).json({ message: "Receiver not found." });
-        }
+        if (!receiver) { return res.status(404).json({ message: "Receiver not found." }); }
 
-        // Remove the friend request sent by senderId
         receiver.friendRequests = receiver.friendRequests.filter(
             (req) => req.sender.toString() !== senderId
         );
 
         await receiver.save();
+
+        const io = req.app.get("io");
+        io.to(receiverId).emit("friendRequestCanceled", { sender: sender });
 
         res.status(200).json({ message: "Friend request canceled successfully." });
     } catch (error) {
@@ -390,7 +475,6 @@ export const GetUsers = async (req, res) => {
 export const HandleFriendRequests = async (req, res) => {
     try {
         const { action, userId, senderId } = req.body;
-        console.log(action, userId, senderId);
 
 
         if (!userId || !senderId || !["accept", "reject"].includes(action)) {
@@ -398,8 +482,7 @@ export const HandleFriendRequests = async (req, res) => {
         }
 
         const [user, sender] = await Promise.all([User.findById(userId), User.findById(senderId),]);
-
-
+        const receiver = await User.findById(userId);
 
 
         if (!user || !sender) { return res.status(404).json({ message: "User or sender not found" }); }
@@ -419,6 +502,10 @@ export const HandleFriendRequests = async (req, res) => {
                     User.findByIdAndUpdate(senderId, { $push: { friends: userId } }),
                 ]);
             }
+
+            const io = req.app.get("io");
+            io.to(senderId).emit("friendRequestAccepted", { receiver, sender });
+
         }
 
         // Remove the friend request from both users
@@ -538,6 +625,67 @@ export const authenticateToken = async (req, res, next) => {
 
 
 
+export const blockFriend = async (req, res) => {
+    try {
+        const { blockedby, userId } = req.body;
+
+        if (!blockedby || !userId) {
+            return res.status(400).json({ message: "Both 'blockedby' and 'userId' are required." });
+        }
+
+
+        const blocker = await User.findById(blockedby);
+        const toBlock = await User.findById(userId);
+
+        if (!blocker || !toBlock) {
+            return res.status(404).json({ message: "One or both users not found." });
+        }
+
+        if (blocker.blockedUsers.includes(userId)) {
+            return res.status(400).json({ message: "User already blocked." });
+        }
+
+        blocker.blockedUsers.push(userId);
+        await blocker.save();
+
+        return res.status(200).json({ message: "User blocked successfully." });
+    } catch (error) {
+        console.error("Error blocking user:", error);
+        return res.status(500).json({ error: "Internal server error." });
+    }
+};
+
+export const unblockFriend = async (req, res) => {
+    try {
+        const { blockedby, userId } = req.body;
+
+        if (!blockedby || !userId) {
+            return res.status(400).json({ message: "Both 'blockedby' and 'userId' are required." });
+        }
+
+        const blocker = await User.findById(blockedby);
+        const toUnblock = await User.findById(userId);
+
+        if (!blocker || !toUnblock) {
+            return res.status(404).json({ message: "One or both users not found." });
+        }
+
+        const index = blocker.blockedUsers.indexOf(userId);
+
+        if (index === -1) {
+            return res.status(400).json({ message: "User is not blocked." });
+        }
+
+        blocker.blockedUsers.splice(index, 1);
+        await blocker.save();
+
+        return res.status(200).json({ message: "User unblocked successfully." });
+    } catch (error) {
+        console.error("Error unblocking user:", error);
+        return res.status(500).json({ error: "Internal server error." });
+    }
+};
+
 
 
 export const clearAllFriendsAndRequests = async (req, res) => {
@@ -554,5 +702,66 @@ export const clearAllFriendsAndRequests = async (req, res) => {
     } catch (error) {
         console.error("Error clearing friends and friend requests:", error);
         res.status(500).json({ error: "Internal server error" });
+    }
+};
+
+
+
+
+
+
+export const muteFriend = async (req, res) => {
+    try {
+        const { userwhohavemuted, userTobeMuted } = req.body;
+
+        if (!userwhohavemuted || !userTobeMuted) {
+            return res.status(400).json({ message: "Both 'userwhohavemuted' and 'userTobeMuted' are required." });
+        }
+
+        const muter = await User.findById(userwhohavemuted);
+        const toMute = await User.findById(userTobeMuted);
+
+        if (!muter || !toMute) {
+            return res.status(404).json({ error: "One or both users not found." });
+        }
+
+        if (muter.mutedUsers.includes(userTobeMuted)) {
+            return res.status(400).json({ error: "User already muted." });
+        }
+
+        muter.mutedUsers.push(userTobeMuted);
+        await muter.save();
+
+        const io = req.app.get("io");
+        const roomId = `chat_${[userwhohavemuted, userTobeMuted].sort().join('_')}`;
+        io.to(roomId).emit("Mute", { userTobeMuted, userwhohavemuted });
+
+        return res.status(200).json({ success: "User muted successfully." });
+    } catch (error) {
+        console.error("Error muting user:", error);
+        return res.status(500).json({ error: "Internal server error." });
+    }
+};
+
+
+export const unmuteUser = async (req, res) => {
+    try {
+        const { userTounbeunMuted, userwhohavemuted } = req.body;
+
+        if (!userTounbeunMuted || !userwhohavemuted) {
+            return res.status(400).json({ error: "Missing parameters." });
+        }
+
+        await User.findByIdAndUpdate(userwhohavemuted, { $pull: { mutedUsers: userTounbeunMuted } });
+
+        const io = req.app.get("io");
+        const roomId = `chat_${[userTounbeunMuted, userwhohavemuted].sort().join('_')}`;
+        io.to(roomId).emit("UnMute", { userTounbeunMuted });
+
+        return res.status(200).json({ success: "User unmuted successfully." });
+
+    } catch (error) {
+        console.error("Error in unmuteUser controller:", error);
+        return res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 };

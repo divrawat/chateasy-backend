@@ -2,7 +2,6 @@ import Message from "../models/message.js";
 import Group from "../models/group.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { v4 as uuidv4 } from "uuid";
-import { sendPushNotification } from "./notification.js";
 import User from '../models/user.js'
 
 import multer from 'multer';
@@ -21,146 +20,12 @@ const s3Client = new S3Client({
 });
 
 
-/*
-export const sendMessage = async (req, res) => {
-    try {
-        console.log(req.body);
 
-        const { sender, receiver, group, messageType, messageContent, mediaUrl } = req.body;
-
-        const newMessage = new Message({
-            sender,
-            receiver: receiver || null,
-            group: group || null,
-            messageType,
-            messageContent,
-            mediaUrl
-        });
-
-        await newMessage.save();
-
-
-        res.status(201).json(newMessage);
-    } catch (error) {
-        console.error("Error sending message:", error);
-        res.status(500).json({ message: "Internal server error" });
-    }
-};
-*/
-
-/*
-export const sendMessage = async (req, res) => {
-    try {
-        const { sender, receiver, group, messageType, messageContent } = req.body;
-        const files = req.files;
-
-        console.log("Incoming body:", req.body);
-
-        let mediaUrls = [];
-
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const fileExt = file.originalname.split(".").pop();
-                const fileName = `${uuidv4()}.${fileExt}`;
-
-                const uploadParams = {
-                    Bucket: process.env.R2_BUCKET_NAME,
-                    Key: fileName,
-                    Body: file.buffer,
-                    ContentType: file.mimetype,
-                };
-
-                const command = new PutObjectCommand(uploadParams);
-                await s3Client.send(command);
-
-                const mediaUrl = `${process.env.R2_PUBLIC_DOMAIN}/${fileName}`;
-                mediaUrls.push({
-                    url: mediaUrl,
-                    name: file.originalname,
-                    type: file.mimetype,
-                });
-            }
-        }
-
-        const newMessage = new Message({
-            sender,
-            receiver: receiver || null,
-            group: group || null,
-            messageType: files?.length ? "file" : "text",
-            messageContent: files?.length ? "" : messageContent,
-            mediaUrls: mediaUrls.length ? mediaUrls : undefined,
-        });
-
-        await newMessage.save();
-
-        res.status(201).json({ success: true, message: newMessage });
-    } catch (error) {
-        console.error("Error sending message:", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
-    }
-};
-*/
-
-/*
-export const sendMessage = async (req, res) => {
-    try {
-        const { sender, receiver, group, messageType } = req.body;
-        console.log(req.body);
-
-        const files = req.files;
-        console.log('length: ', files.length);
-
-
-
-        let messageContent = [];
-
-        if (files && files.length > 0) {
-            for (const file of files) {
-                const fileExt = file.originalname.split(".").pop();
-                const fileName = `${uuidv4()}.${fileExt}`;
-
-                const uploadParams = {
-                    Bucket: process.env.R2_BUCKET_NAME,
-                    Key: fileName,
-                    Body: file.buffer,
-                    ContentType: file.mimetype,
-                };
-
-                const command = new PutObjectCommand(uploadParams);
-                await s3Client.send(command);
-
-                const mediaUrl = `${process.env.R2_DEV_URL_MESSAGE}/${fileName}`;
-                // console.log('00000000000', mediaUrl);
-
-                messageContent.push(mediaUrl);
-            }
-        }
-
-        if (!files || files.length === 0) {
-            messageContent = req.body.messageContent || "";
-        }
-
-        const newMessage = new Message({
-            sender,
-            receiver: receiver || null,
-            group: group || null,
-            type: files?.length ? "file" : "text",
-            messageContent,
-        });
-
-        await newMessage.save();
-
-        res.status(201).json({ success: true, message: newMessage });
-    } catch (error) {
-        console.error("Error sending message:", error);
-        res.status(500).json({ success: false, message: "Internal server error" });
-    }
-};
-*/
 
 export const sendMessage = async (req, res) => {
     try {
         const { sender, receiver, group, messageContent: bodyMessageContent } = req.body;
+
         const files = req.files;
         let messageContent = [];
 
@@ -195,20 +60,19 @@ export const sendMessage = async (req, res) => {
         });
 
         await newMessage.save();
+        const messageObj = newMessage.toObject();
 
-        const recipient = await User.findById(receiver);
-        const pushToken = recipient?.expoPushToken;
+        const io = req.app.get('io');
+        const roomId = `chat_${[sender, receiver].sort().join('_')}`;
 
-        if (pushToken) {
-            await sendPushNotification(
-                pushToken,
-                'New Message',
-                files?.length ? '📎 Media message received' : messageContent.slice(0, 100),
-                { messageId: newMessage._id }
-            );
+        if (group) {
+            io.to(`group_${group}`).emit("receiveGroupMessage", messageObj);
+        } else if (receiver) {
+            io.to(roomId).emit("receiveMessage", { ...messageObj, roomId, });
         }
 
-        res.status(201).json({ success: true, message: newMessage });
+
+        res.status(201).json({ success: true, message: messageObj });
     } catch (error) {
         console.error('Error sending message:', error);
         res.status(500).json({ success: false, message: 'Internal server error' });
@@ -219,41 +83,28 @@ export const sendMessage = async (req, res) => {
 
 export const deleteMessage = async (req, res) => {
     try {
-        const { messageId } = req.params;
-        const { userId } = req.body;
-        const io = req.app.get("io");
+        const { messageId, sender } = req.body;
+
+
+        if (!messageId) { return res.status(400).json({ success: false, message: "Message ID is required" }); }
 
         const message = await Message.findById(messageId);
-        if (!message) {
-            return res.status(404).json({ message: "Message not found" });
-        }
+        if (!message) { return res.status(404).json({ success: false, error: "Message not found" }); }
 
-        let isAuthorized = false;
+        // console.log("Message Sender", message.sender.toString());
+        // console.log("Sender", sender);
 
-        if (message.group) {
-            const group = await Group.findById(message.group);
-            if (!group) {
-                return res.status(404).json({ message: "Group not found" });
-            }
-            const isAdmin = group.admins.some(admin => admin.toString() === userId);
-            const isSender = message.sender.toString() === userId;
-            isAuthorized = isAdmin || isSender;
-        } else {
-            isAuthorized = message.sender.toString() === userId;
-        }
 
-        if (!isAuthorized) {
-            return res.status(403).json({ message: "Unauthorized to delete this message" });
-        }
+        if (message.sender.toString() !== sender) { return res.status(400).json({ success: false, error: "You can only delete your messages" }); }
 
-        await Message.findByIdAndDelete(messageId);
 
-        io.emit("messageDeleted", { messageId });
+        message.isDeleted = true;
+        await message.save();
 
-        res.status(200).json({ message: "Message deleted successfully", messageId });
+        return res.status(200).json({ success: true, message: "Message deleted successfully" });
     } catch (error) {
         console.error("Error deleting message:", error);
-        res.status(500).json({ message: "Internal server error" });
+        return res.status(500).json({ success: false, message: "Server Error" });
     }
 };
 
@@ -262,12 +113,6 @@ export const deleteMessage = async (req, res) => {
 export const getMessages = async (req, res) => {
     try {
         const { sender, receiver, group } = req.query;
-        const io = req.app.get("io");
-
-        if (!io) {
-            console.error("Socket.io not initialized");
-            return res.status(500).json({ message: "Internal server error" });
-        }
 
         let messages;
 
@@ -286,12 +131,7 @@ export const getMessages = async (req, res) => {
 
         messages = messages.map(msg => msg.toObject());
 
-        if (group) {
-            io.to(group).emit("loadMessages", messages);
-        } else {
-            if (sender) io.to(sender).emit("loadMessages", messages);
-            if (receiver) io.to(receiver).emit("loadMessages", messages);
-        }
+
 
         res.status(200).json(messages);
     } catch (error) {
@@ -319,3 +159,54 @@ export const markMessagesAsRead = async (req, res) => {
         return res.status(500).json({ success: false, error: error.message });
     }
 }
+
+
+
+export const MessagesAsRead = async (req, res) => {
+    const { messageId } = req.body;
+
+    try {
+        const updatedMessage = await Message.findByIdAndUpdate(
+            messageId,
+            { isRead: true },
+            { new: true }
+        );
+
+        const io = req.app.get('io');
+
+        const { sender, receiver, group } = updatedMessage;
+
+
+        const roomId = `chat_${[sender, receiver].sort().join('_')}`;
+        io.to(roomId).emit('messageMarkedAsRead', updatedMessage);
+
+        return res.status(200).json({ success: true, updatedMessage });
+    } catch (error) {
+        console.error('Error marking message as read:', error);
+        return res.status(500).json({ success: false, message: 'Internal server error' });
+    }
+};
+
+
+export const markMultipleMessagesAsRead = async (req, res) => {
+    const { messageIds, senderId, receiverId } = req.body;
+
+    try {
+
+        const result = await Message.updateMany(
+            { _id: { $in: messageIds }, isRead: false },
+            { $set: { isRead: true } }
+        );
+
+        const io = req.app.get('io');
+        const roomId = `chat_${[senderId, receiverId].sort().join('_')}`;
+        io.to(roomId).emit('markMultipleMessagesAsRead', { ids: messageIds });
+
+        res.status(200).json({ success: true, updatedCount: result.modifiedCount || result.nModified });
+    } catch (error) {
+        console.error("Error marking multiple messages as read:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
+

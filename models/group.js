@@ -7,9 +7,11 @@ const GroupSchema = new mongoose.Schema({
     },
     description: {
         type: String,
+        required: true
     },
     photo: {
         type: String,
+        required: true
     },
     creator: {
         type: mongoose.Schema.Types.ObjectId,
@@ -23,20 +25,17 @@ const GroupSchema = new mongoose.Schema({
     members: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true
     }],
-    blockedUsers: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+    leftUsers: [{
+        user: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User"
+        },
+        leftAt: {
+            type: Date,
+            default: Date.now
+        }
     }],
-    mutedUsers: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-    }],
-    isPrivate: {
-        type: Boolean,
-        default: false
-    }
 }, { timestamps: true });
 
 export default mongoose.model("Group", GroupSchema);

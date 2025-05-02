@@ -1,9 +1,10 @@
 import express from "express";
 const router = express.Router();
+import User from '../models/user.js'
 
 import {
     sendOTP, verifyOTP, getBlockedUsers, fetchUser, GetUsers, FriendRequest, HandleFriendRequests, UnFriendRequest, getAllFriendRequests,
-    upload, uploadFile, getAllFriends, clearAllFriendsAndRequests
+    upload, uploadFile, getAllFriends, clearAllFriendsAndRequests, blockFriend, unblockFriend, muteFriend, unmuteUser
 } from "../controllers/user.js"
 
 
@@ -13,6 +14,9 @@ router.post("/friend-request", FriendRequest);
 router.post("/unfriend-request", UnFriendRequest);
 router.post("/handle-friend-request/:sendersId", HandleFriendRequests);
 
+router.post("/block-friend", blockFriend);
+router.post("/unblock-friend", unblockFriend);
+
 router.post("/upload", upload.single("file"), uploadFile)
 
 router.get("/search-users", GetUsers);
@@ -21,17 +25,8 @@ router.get("/all-friends/:userId", getAllFriends);
 router.get("/user/:userId", fetchUser);
 router.get("/user/:userId/blocked", getBlockedUsers);
 
-
-
-router.post('/update-token', async (req, res) => {
-    const { userId, expoPushToken } = req.body;
-    try {
-        await User.findByIdAndUpdate(userId, { expoPushToken });
-        res.status(200).json({ success: true });
-    } catch (err) {
-        res.status(500).json({ success: false, message: err.message });
-    }
-});
+router.post("/mute-friend", muteFriend);
+router.post("/unmute-friend", unmuteUser);
 
 
 router.get("/clear-friends-and-requests", clearAllFriendsAndRequests);
