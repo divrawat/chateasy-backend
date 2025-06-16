@@ -3,6 +3,7 @@ import Group from "../models/group.js";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3"
 import { v4 as uuidv4 } from "uuid";
 import User from '../models/user.js'
+import sendPushNotification from "./notification.js";
 
 import multer from 'multer';
 export const myupload = multer({});
@@ -70,6 +71,22 @@ export const sendMessage = async (req, res) => {
         } else if (receiver) {
             io.to(roomId).emit("receiveMessage", { ...messageObj, roomId, });
         }
+
+
+
+
+        const receiverUser = await User.findById(receiver);
+        if (receiverUser?.expoPushToken) {
+            const senderUser = await User.findById(sender);
+            const senderName = senderUser?.name || "New Message";
+            const preview = typeof messageContent === "string" ? messageContent : "📎 Media file";
+
+            await sendPushNotification(receiverUser.expoPushToken, senderName, preview);
+        }
+
+
+
+
 
 
         res.status(201).json({ success: true, message: messageObj });
@@ -210,3 +227,18 @@ export const markMultipleMessagesAsRead = async (req, res) => {
 };
 
 
+export const savePushToken = async (req, res) => {
+    try {
+        const { userId, expoPushToken } = req.body;
+
+        if (!userId || !expoPushToken) {
+            return res.status(400).json({ success: false, message: "Missing fields" });
+        }
+
+        await User.findByIdAndUpdate(userId, { expoPushToken });
+        res.json({ success: true, message: "Token saved" });
+    } catch (err) {
+        console.error("Error saving token:", err);
+        res.status(500).json({ success: false, message: "Server error" });
+    }
+};

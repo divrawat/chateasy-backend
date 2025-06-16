@@ -260,6 +260,13 @@ export const fetchUser = async (req, res) => {
                     ],
                 }).sort({ createdAt: -1 }).select("messageContent createdAt").lean();
 
+
+                const unreadCount = await Message.countDocuments({
+                    sender: friend._id,
+                    receiver: user._id,
+                    isRead: false,
+                });
+
                 return {
                     _id: friend._id,
                     name: friend.name,
@@ -271,6 +278,7 @@ export const fetchUser = async (req, res) => {
                     mutedUsers: friend.mutedUsers,
                     lastMessage: lastMessage?.messageContent ? decrypt(lastMessage.messageContent) : null,
                     lastMessageTime: lastMessage?.createdAt || null,
+                    unreadCount,
                 };
             })
         );

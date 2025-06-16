@@ -1,5 +1,5 @@
 import express from "express";
-import { sendMessage, deleteMessage, getMessages, markMessagesAsRead, myupload, MessagesAsRead, markMultipleMessagesAsRead } from "../controllers/message.js";
+import { sendMessage, deleteMessage, getMessages, markMessagesAsRead, myupload, MessagesAsRead, markMultipleMessagesAsRead, savePushToken } from "../controllers/message.js";
 
 const router = express.Router();
 
@@ -17,5 +17,8 @@ router.post("/markMessageAsRead", MessagesAsRead);
 router.post("/markMultipleMessagesAsRead", markMultipleMessagesAsRead);
 router.get("/get-messages", getMessages);
 router.delete("/delete-message", deleteMessage);
+
+
+router.post("/save-token", savePushToken);
 
 export default router;

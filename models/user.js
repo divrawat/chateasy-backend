@@ -13,7 +13,6 @@ const UserSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
-        unique: true
     },
     photo: {
         type: String,
@@ -62,6 +61,7 @@ const UserSchema = new mongoose.Schema({
     otpExpiresAt: {
         type: Date
     },
+    expoPushToken: String,
 }, { timestamps: true });
 
 export default mongoose.model("User", UserSchema);
